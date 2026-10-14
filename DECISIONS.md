@@ -1,0 +1,6 @@
+# DECISIONS.md
+1. **Indexes.** Unique `emp_code` on employees and unique `(emp_code, date)` on logs: they make duplicates impossible and serve punch-in, monthly and trend. `(date desc, emp_code)` and `(status, date desc, emp_code)` give `GET /attendance` its sort without loading data. `(date, late_minutes, emp_code)` covers the leaderboard; `(emp_code, punch_in desc)` finds the record to punch out; `joined_on` and `(department, joined_on)` serve headcount. Rejected: copying `department` onto every log, because it can go stale.
+2. **Punch-in race.** Both requests try `insert_one`. The unique `(emp_code, date)` index lets exactly one succeed; the other gets `DuplicateKeyError`, which I return as 409. There is no check-then-insert.
+3. **Ties.** `$rank` gives tied employees the same rank, and I filter `rank <= limit` after ranking. Everyone tied at the cutoff is returned, so the list can be longer than `limit`.
+4. **Headcount.** The summary starts from `employees` (`joined_on` <= month end) and joins logs per employee, so someone with no logs still counts once.
+5. **100x data.** The trend sends all department employee codes in one `$in` list. At 100x I would pre-aggregate daily department totals instead.
